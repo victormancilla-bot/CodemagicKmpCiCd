@@ -1,0 +1,73 @@
+workflows:
+  android-pr-ci:
+    name: CI - Pull Request Validation
+    max_build_duration: 30
+    instance_type: mac_mini_m2
+    triggering:
+      events:
+        - pull_request
+      branch_patterns:
+        - pattern: 'main'
+          include: true
+          source: false
+    environment:
+      java: 21
+    cache:
+      cache_paths:
+        - $HOME/.gradle/caches
+        - $HOME/.gradle/wrapper
+    scripts:
+      - name: Configurar Android SDK y permisos de Gradle
+        script: |
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > "$CM_BUILD_DIR/local.properties"
+          chmod +x ./gradlew
+      - name: Ejecutar pruebas unitarias compartidas (CI)
+        script: |
+          ./gradlew :shared:testAndroidHostTest
+      - name: Ejecutar Quality Gate con Android Lint
+        script: |
+          ./gradlew :androidApp:lintDebug
+    artifacts:
+      - androidApp/build/reports/lint-results-debug.html
+
+  android-main-cicd:
+    name: CI/CD - Release Signed APK (main)
+    max_build_duration: 30
+    instance_type: mac_mini_m2
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: 'main'
+          include: true
+          source: true
+    environment:
+      java: 21
+      groups:
+        - android_signing
+      vars:
+        CM_KEYSTORE_PATH: /tmp/release.jks
+    cache:
+      cache_paths:
+        - $HOME/.gradle/caches
+        - $HOME/.gradle/wrapper
+    scripts:
+      - name: Configurar Android SDK y decodificar Keystore (DevSecOps)
+        script: |
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > "$CM_BUILD_DIR/local.properties"
+          chmod +x ./gradlew
+          echo "$CM_KEYSTORE_BASE64" | base64 --decode > "$CM_KEYSTORE_PATH"
+          test -s "$CM_KEYSTORE_PATH" && echo "Keystore decodificado correctamente"
+      - name: Ejecutar pruebas unitarias compartidas (CI)
+        script: |
+          ./gradlew :shared:testAndroidHostTest
+      - name: Ejecutar Quality Gate con Android Lint
+        script: |
+          ./gradlew :androidApp:lintDebug
+      - name: Compilar APK Release firmado con versionado automatico (CD)
+        script: |
+          echo "Compilando Release v1.0.$BUILD_NUMBER (versionCode=$BUILD_NUMBER)"
+          ./gradlew :androidApp:assembleRelease
+    artifacts:
+      - androidApp/build/outputs/apk/release/*.apk
+      - androidApp/build/reports/lint-results-debug.html
