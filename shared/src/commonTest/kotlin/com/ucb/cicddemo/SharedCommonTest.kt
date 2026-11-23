@@ -28,11 +28,16 @@ class SharedCommonTest {
 
     @Test
     fun passPercentageCalculatesCorrectly() {
-        assertEquals(99, validator.calculatePassPercentage(4, 5))
+        assertEquals(80, validator.calculatePassPercentage(4, 5))
     }
 
     @Test
     fun passPercentageHandlesZeroTotalSafely() {
         assertEquals(0, validator.calculatePassPercentage(3, 0))
+    }
+
+    @Test
+    fun passPercentageCapsAtOneHundred() {
+        assertEquals(100, validator.calculatePassPercentage(7, 5))
     }
 }
